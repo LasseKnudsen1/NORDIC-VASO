@@ -9,19 +9,12 @@ if ARG.runningMode=="saveMode"
     deltas_dif=spm_read_vols(spm_vol(ARG.pdeltas_dif));
     deltas_NORDIC_resample=spm_read_vols(spm_vol(ARG.pdeltas_NORDIC_resample));
     deltas_noNORDIC_resample=spm_read_vols(spm_vol(ARG.pdeltas_noNORDIC_resample));
-    tVals_NORDIC=spm_read_vols(spm_vol(ARG.ptVal_NORDIC));
-    tVals_noNORDIC=spm_read_vols(spm_vol(ARG.ptVal_noNORDIC));
-    tSNR_NORDIC=spm_read_vols(spm_vol(ARG.ptSNR_NORDIC));
-    tSNR_noNORDIC=spm_read_vols(spm_vol(ARG.ptSNR_noNORDIC));
-    raw_magn_NORDIC=spm_read_vols(spm_vol(ARG.praw_magn_NORDIC));
-    raw_magn_noNORDIC=spm_read_vols(spm_vol(ARG.praw_magn_noNORDIC));
     ROI=spm_read_vols(spm_vol(ARG.pROI));
     depthmap=spm_read_vols(spm_vol(ARG.pdepthmap));
 
 
     %reshape to vector format and get rid of potential noiseVolumes:
     s=size(PSCs_noNORDIC);
-    s_raw=size(raw_magn_noNORDIC);
     s_resample=size(deltas_NORDIC_resample);
 
     PSCs_NORDIC=reshape(PSCs_NORDIC,s(1)*s(2)*s(3),s(4));
@@ -29,12 +22,6 @@ if ARG.runningMode=="saveMode"
     deltas_dif=reshape(deltas_dif,s(1)*s(2)*s(3),s(4));
     deltas_NORDIC_resample=reshape(deltas_NORDIC_resample,s_resample(1)*s_resample(2)*s_resample(3),s_resample(4));
     deltas_noNORDIC_resample=reshape(deltas_noNORDIC_resample,s_resample(1)*s_resample(2)*s_resample(3),s_resample(4));
-    tVals_NORDIC=reshape(tVals_NORDIC,s(1)*s(2)*s(3),1);
-    tVals_noNORDIC=reshape(tVals_noNORDIC,s(1)*s(2)*s(3),1);
-    tSNR_NORDIC=reshape(tSNR_NORDIC,s(1)*s(2)*s(3),1);
-    tSNR_noNORDIC=reshape(tSNR_noNORDIC,s(1)*s(2)*s(3),1);
-    raw_magn_NORDIC=reshape(raw_magn_NORDIC(:,:,:,1:ARG.num_vol),s_raw(1)*s_raw(2)*s_raw(3),s_raw(4)); %make sure potential noise-volumes aren't included
-    raw_magn_noNORDIC=reshape(raw_magn_noNORDIC(:,:,:,1:ARG.num_vol),s_raw(1)*s_raw(2)*s_raw(3),s_raw(4));
     ROI=reshape(ROI,s(1)*s(2)*s(3),1);
     depthmap=reshape(depthmap,s_resample(1)*s_resample(2)*s_resample(3),1);
 
@@ -43,12 +30,6 @@ if ARG.runningMode=="saveMode"
     PSCs_NORDIC=PSCs_NORDIC(idx,:);
     PSCs_noNORDIC=PSCs_noNORDIC(idx,:);
     deltas_dif=deltas_dif(idx,:);
-    tVals_NORDIC=tVals_NORDIC(idx,:);
-    tVals_noNORDIC=tVals_noNORDIC(idx,:);
-    tSNR_NORDIC=tSNR_NORDIC(idx,:);
-    tSNR_noNORDIC=tSNR_noNORDIC(idx,:);
-    raw_magn_NORDIC=raw_magn_NORDIC(idx,:);
-    raw_magn_noNORDIC=raw_magn_noNORDIC(idx,:);
 
     %Remove voxels outside depthmap:
     idx_resample=find(depthmap>0);
@@ -56,18 +37,22 @@ if ARG.runningMode=="saveMode"
     deltas_noNORDIC_resample=deltas_noNORDIC_resample(idx_resample,:);
     depthmap=depthmap(idx_resample,1);
 
+    %Load and prepare run-wise MOCO files:
+    for run=1:numel(ARG.runs)
+    tmp_moco_NORDIC{run}=spm_read_vols(spm_vol(ARG.pMoco_NORDIC{run}));
+    tmp_moco_noNORDIC{run}=spm_read_vols(spm_vol(ARG.pMoco_noNORDIC{run}));
 
-    %If 'f' version, also load and prepare raw phase timeseries:
-    if sum(ARG.version=='f') == 1
-        raw_phase_NORDIC=spm_read_vols(spm_vol(ARG.praw_phase_NORDIC));
-        raw_phase_noNORDIC=spm_read_vols(spm_vol(ARG.praw_phase_noNORDIC));
+    %reshape to vector format and get rid of potential noiseVolumes:
+    s=size(tmp_moco_noNORDIC{run});
+    tmp_moco_NORDIC{run}=reshape(tmp_moco_NORDIC{run}(:,:,:,1:ARG.num_vol),s(1)*s(2)*s(3),ARG.num_vol); %make sure potential noise-volumes aren't included
+    tmp_moco_noNORDIC{run}=reshape(tmp_moco_noNORDIC{run}(:,:,:,1:ARG.num_vol),s(1)*s(2)*s(3),ARG.num_vol);
 
-        raw_phase_NORDIC=reshape(raw_phase_NORDIC(:,:,:,1:ARG.num_vol),s_raw(1)*s_raw(2)*s_raw(3),s_raw(4));
-        raw_phase_noNORDIC=reshape(raw_phase_noNORDIC(:,:,:,1:ARG.num_vol),s_raw(1)*s_raw(2)*s_raw(3),s_raw(4));
-
-        raw_phase_NORDIC=raw_phase_NORDIC(idx,:);
-        raw_phase_noNORDIC=raw_phase_noNORDIC(idx,:);
+    %Remove voxels outside ROI:
+    tmp_moco_NORDIC{run}=tmp_moco_NORDIC{run}(idx,:);
+    tmp_moco_noNORDIC{run}=tmp_moco_noNORDIC{run}(idx,:);
     end
+
+
     %Remove fields that could be set differently in loadMode:
     rmfield(ARG,'runningMode')
 
@@ -102,9 +87,9 @@ set(gca,'FontSize',15)
 sgtitle(sprintf('%s - single-voxel PSC NORDIC vs noNORDIC \n slope = %02f constant = %02f ',ARG.version,b(2),b(1)),'fontsize',15,'fontweight','bold')
 hold off
 
-if saveFigs==1
-saveas(f2,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_nordicAsFunctionOfNoNORDIC'],'epsc')
-end
+% if saveFigs==1
+% saveas(f2,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_nordicAsFunctionOfNoNORDIC'],'epsc')
+% end
 %% Boxplot PSC single trials (averaged across voxels)
 %Load .mat files containing single-trial PSCs computed from across-voxel
 %averaged timeseries:
@@ -141,11 +126,36 @@ set(gca,'Color','none')
 set(gcf,'Color',[1 1 1])
 hold off
 
-if saveFigs==1
-saveas(f3,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_boxplotSingleTrials'],'epsc')
+% if saveFigs==1
+% saveas(f3,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_boxplotSingleTrials'],'epsc')
+% end
+
+%% Trial timeseries
+f4=figure;
+hold on
+plot(acrossVoxelAvg_PSCs_NORDIC,'r')
+plot(acrossVoxelAvg_PSCs_noNORDIC,'b')
+xlabel('Trial number')
+ylabel('PSC')
+if ARG.contrast=='VASO'
+ylim([0,1.8])
+elseif ARG.contrast=='BOLD'
+ylim([0,2.2])
 end
+set(gca,'XColor',[0 0 0])
+set(gca,'YColor',[0 0 0])
+set(gca,'fontname','times')
+set(gca,'FontSize',10)
+set(gca,'Color','none')
+set(gcf,'Color',[1 1 1])
+%legend('NORDIC','noNORDIC')
+hold off
 
+sgtitle(sprintf('%s - PSC as a function of trial number',ARG.version),'fontsize',18,'fontweight','bold')
 
+% if saveFigs==1
+% saveas(f4,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_autoCorrAcrossTrials'],'epsc')
+% end
 %% Get layer profiles
 stepsize=0.1;
 lower_depth=0.05;
@@ -197,9 +207,9 @@ ylim([0 80])
 end
 hold off
 
-if saveFigs==1
-saveas(f6,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_layerProfiles'],'epsc')
-end
+% if saveFigs==1
+% saveas(f6,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_layerProfiles'],'epsc')
+% end
 
 %% Get subsampled layer profiles:
 f7=figure;
@@ -220,11 +230,179 @@ for skip=skipFactors
         set(gca,'YColor',[0 0 0])
         set(gca,'fontname','arial')
         set(gcf,'Color',[1 1 1])
-        %ylim([0 0.03])
+        ylim([0 0.02])
         %legend('NORDIC','noNORDIC')
         hold off
     end
     counter1=counter1+1;
 end
+
+
+%% PSC analysis from moco files 
+%Prepare files:
+for run=1:numel(ARG.runs)
+    %Change to double format instead of cell:
+    TS_NORDIC(run,:,:)=tmp_moco_NORDIC{run};
+    TS_noNORDIC(run,:,:)=tmp_moco_noNORDIC{run};
+    %Get rid of first non-steady state volume (set equal to second volume)
+    TS_NORDIC(run,:,1)=TS_NORDIC(run,:,2);
+    TS_noNORDIC(run,:,1)=TS_noNORDIC(run,:,2);
+    %Get difference timeseries:
+    difTS_moco(run,:,:)=TS_NORDIC(run,:,:)-TS_noNORDIC(run,:,:);
+end
+
+
+%Get voxel-averaged timeseries:
+for run=1:numel(ARG.runs)
+voxAvg_TS_NORDIC(run,:)=squeeze(mean(TS_NORDIC(run,:,:),2));
+voxAvg_TS_noNORDIC(run,:)=squeeze(mean(TS_noNORDIC(run,:,:),2));
+end
+
+%Get mean across all rest and all task volumes in each run:
+num_blocks=ARG.num_blocks;
+discardFirstVols=ARG.discardFirstVols;
+for run=1:numel(ARG.runs)
+lower=discardFirstVols+1;
+upper=ARG.num_TRperBlock;
+tmpRest_NORDIC=[];
+tmpRest_noNORDIC=[];
+tmpOn_NORDIC=[];
+tmpOn_noNORDIC=[];
+for block=1:num_blocks
+    if mod(block,2)==1 %odd blocks
+        tmpRest_NORDIC=[tmpRest_NORDIC voxAvg_TS_NORDIC(run,lower:upper)];
+        tmpRest_noNORDIC=[tmpRest_noNORDIC voxAvg_TS_noNORDIC(run,lower:upper)];
+    elseif mod(block,2)==0 %Even blocks
+        tmpOn_NORDIC=[tmpOn_NORDIC voxAvg_TS_NORDIC(run,lower:upper)];
+        tmpOn_noNORDIC=[tmpOn_noNORDIC voxAvg_TS_noNORDIC(run,lower:upper)];
+    end
+    lower=lower+ARG.num_TRperBlock;
+    upper=upper+ARG.num_TRperBlock;
+end
+restTRs_NORDIC(run,:)=tmpRest_NORDIC;
+restTRs_noNORDIC(run,:)=tmpRest_noNORDIC;
+onTRs_NORDIC(run,:)=tmpOn_NORDIC;
+onTRs_noNORDIC(run,:)=tmpOn_noNORDIC;
+end
+
+%Get percent change for each run:
+if ARG.contrast=="VASO"
+    PSC_NORDIC=-100*((mean(onTRs_NORDIC,2)-mean(restTRs_NORDIC,2))./mean(restTRs_NORDIC,2));
+    PSC_noNORDIC=-100*((mean(onTRs_noNORDIC,2)-mean(restTRs_noNORDIC,2))./mean(restTRs_noNORDIC,2));
+else
+    PSC_NORDIC=100*((mean(onTRs_NORDIC,2)-mean(restTRs_NORDIC,2))./mean(restTRs_NORDIC,2));
+    PSC_noNORDIC=100*((mean(onTRs_noNORDIC,2)-mean(restTRs_noNORDIC,2))./mean(restTRs_noNORDIC,2));
+end
+PSC_dif=PSC_noNORDIC-PSC_NORDIC;
+
+%Set color and edge for bargraph plot:
+if sum(ARG.version=='c') == 1
+    currentColor=[0.4 0.4 0.4];
+else
+    currentColor=[0.6 0.6 0.6];
+end
+if sum(ARG.version=='f') == 1
+    currentLinestyle='-';
+else
+    currentLinestyle='--';
+end
+
+
+dotSize=200;
+barWidth=0.9;
+f8=figure;
+subtightplot(2,1,1, [0.08, 0.1], 0.05, 0.3) %[gap_Ver, gap_Hor], margin_T/B, margin_L/R
+hold on
+plot([0.6 1.4],[mean(PSC_noNORDIC) mean(PSC_noNORDIC)],'r','linewidth',3)
+bar(2,mean(PSC_NORDIC),barWidth,'facecolor',currentColor,'linestyle',currentLinestyle,'linewidth',2)
+for run=1:numel(ARG.runs)
+plot([1,2],[PSC_noNORDIC(run),PSC_NORDIC(run)],'k')
+end
+scatter(1,PSC_noNORDIC,dotSize,'r')
+scatter(2,PSC_NORDIC,dotSize,'k')
+xlim([0,3])
+ylim([0 1])
+set(gca,'XTick',0)
+set(gca,'XTickLabel',"")
+set(gcf,'Color',[1 1 1])
+set(gca,'FontSize',30)
+sgtitle(sprintf('%s',ARG.version),'fontsize',10,'fontweight','bold')
+hold off
+
+subtightplot(2,1,2, [0.08, 0.1], 0.05, 0.3) %[gap_V, gap_H], margin_T/B, margin_L/R
+hold on
+scatter(1.5,PSC_dif,dotSize-50,'filled')
+plot([1.1,1.9],[mean(PSC_dif) mean(PSC_dif)],'k',linewidth=3)
+xlim([0 3])
+ylim([0 0.22])
+set(gcf,'Color',[1 1 1])
+set(gca,'FontSize',30)
+set(gca,'XTick',0)
+set(gca,'XTickLabel',"")
+hold off
+
+f8.Position=[500 0 400 1500]; %[left bottom width height]
+if saveFigs==1
+saveas(f8,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_PSCdifferences'],'svg')
+end
+
+%% Plot Average timeseries across runs and voxels:
+% voxRunAvg_TS_NORDIC=squeeze(mean(TS_NORDIC,[1,2]));
+% voxRunAvg_TS_noNORDIC=squeeze(mean(TS_noNORDIC,[1,2]));
+% voxRunAvg_difTS_moco=squeeze(mean(difTS_moco,[1,2]));
+% 
+% %Make paradigm for illustration:
+% paradigm=repmat([-0.0005*ones(1,ARG.num_TRperBlock),...
+%                   0.0005*ones(1,ARG.num_TRperBlock)],1,ARG.num_blocks/2);
+% 
+% %Plot run-voxel averaged timeseries:
+% f9=figure;
+% subtightplot(3,1,1, [0.03, 0.1], 0.05, 0.15) %[gap_Ver, gap_Hor], margin_T/B, margin_L/R
+% hold on
+% plot(voxRunAvg_TS_NORDIC,'r')
+% plot(voxRunAvg_TS_noNORDIC,'b')
+% if ARG.contrast=="VASO"
+% ylim([0.862 0.884]);
+% set(gca,'YTick',[0.862 0.884])
+% set(gca,'YTickLabel',["0.862" "0.884"])
+% set(gca,'XTick',[0 144])
+% set(gca,'XTickLabel',["" ""])
+% end
+% set(gcf,'Color',[1 1 1])
+% set(gca,'FontSize',5)
+% 
+% subtightplot(3,1,2, [0.03, 0.1], 0.05, 0.15) %[gap_Ver, gap_Hor], margin_T/B, margin_L/R
+% hold on
+% plot(voxRunAvg_TS_NORDIC-mean(voxRunAvg_TS_NORDIC),'r')
+% plot(voxRunAvg_TS_noNORDIC-mean(voxRunAvg_TS_noNORDIC),'b')
+% if ARG.contrast=="VASO"
+% set(gca,'YTick',[-0.01 0 0.01])
+% set(gca,'YTickLabel',["-0.01" "0" "0.01"])
+% set(gca,'XTick',[0 144])
+% set(gca,'XTickLabel',["" ""])
+% end
+% set(gcf,'Color',[1 1 1])
+% set(gca,'FontSize',5)
+% 
+% subtightplot(3,1,3, [0.03, 0.1], 0.05, 0.15) %[gap_Ver, gap_Hor], margin_T/B, margin_L/R
+% hold on
+% plot(paradigm,'Color',[0.2 1 0.2],'linewidth',3)
+% plot(voxRunAvg_difTS_moco-mean(voxRunAvg_difTS_moco),'k')
+% if ARG.contrast=="VASO"
+% ylim([-0.0028 0.002]);
+% set(gca,'YTick',[-0.0028 0 0.002])
+% set(gca,'YTickLabel',["-0.0028" "0" "0.002"])
+% set(gca,'XTick',[0 144])
+% set(gca,'XTickLabel',["" ""])
+% end
+% set(gcf,'Color',[1 1 1])
+% set(gca,'FontSize',5)
+% sgtitle(sprintf('%s',ARG.version),'fontsize',10,'fontweight','bold')
+% 
+% f9.Position=[400 0 600 350]; %[left bottom width height]
+% if saveFigs==1
+% saveas(f9,[ARG.rootDir 'figures/' ARG.version '/' ARG.contrast '_mocoTimeseries'],'svg')
+% end
+
 
 end
